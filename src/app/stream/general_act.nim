@@ -99,6 +99,7 @@ proc routeAnime(route: StreamRoute) =
     route.logger.text(anime.title, color(fgBlack, bgYellow))
     ses.anime = anime
     ses.episodes = ses.ex.episodes (ses.ex.get anime)
+    ses.episodeIndex = ses.episodes.find ses.episodes.ask("Select Episode")
     appAnime.setSession(ses)
     
   block exec:    
