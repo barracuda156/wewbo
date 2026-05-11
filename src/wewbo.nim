@@ -25,7 +25,7 @@ let app = [
   newSubCommand("player", player, help="Player Test & List", argOpts = @[
       option("--test", "test", tBool, false, "Test Player"),
       option("--list", "list", tBool, false, "List Player"),
-      option("-u", "url", tString, "https://huggingface.co/buckets/upi-0/astungkara/resolve/bon-apetit-op.mp4", "Media URL"),
+      option("-u", "url", tString, "https://huggingface.co/buckets/upi-0/example-video/resolve/nggyu.webm", "Media URL"),
       option("-p", "player_path", tString, help="player path")      
     ]
   ),
