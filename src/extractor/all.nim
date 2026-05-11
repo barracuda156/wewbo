@@ -86,6 +86,14 @@ proc ask*(ex: BaseExtractor; formats: seq[ExFormatData]; prevSelectedFormat: Opt
 
   formats.ask("Select Format")    
 
+proc findMatch*(listFormat: seq[ExFormatData]; prevSelectedFormat: Option[FormatIdentity]) : ExFormatData =
+  if prevSelectedFormat.isSome:
+    for fmt in listFormat:
+      if detectFormat(fmt.title) == prevSelectedFormat.get:
+        return fmt
+  
+  listFormat.ask("Select Format")
+
 export
   BaseExtractor,
   AnimeData,
