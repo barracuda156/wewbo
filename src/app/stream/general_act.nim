@@ -1,9 +1,10 @@
 import ../tui
 from tui/utils import waitFor
 
-import extractor/all
-import player/all
-import marshal, options
+import
+  extractor/all, player/all, media/format
+import
+  marshal, options
 
 type
   StreamSession* = tuple[
@@ -11,7 +12,9 @@ type
     anime: AnimeData,
     player: Player,
     episodes: seq[EpisodeData],
-    episodeIndex: int
+    episodeIndex: int,
+    selectedFormat: Option[FormatIdentity] = none(FormatIdentity),
+    autoSelectFormat = false
   ]  
 
   StreamRoute = Route[StreamSession]  
@@ -41,8 +44,11 @@ proc realWatch(route: StreamRoute) =
     let sub = subtitles.get.ask()
     player.watch(media, some sub)    
 
-  else:
-    player.watch(media)
+  if route.session.selectedFormat.isNone:
+    route.session.selectedFormat = block:
+      mediaFormat.title.detectFormat.some
+
+  player.watch(media)
 
 proc selectAndPlay(route: StreamRoute) =
   let
@@ -55,7 +61,16 @@ proc selectAndPlay(route: StreamRoute) =
     route.error("No format available")    
     return
 
-  let mediaFormat = listFormat.ask("Select Format")
+  var mediaFormat: ExFormatData
+  
+  if ses.autoSelectFormat:
+    mediaFormat = findMatch(listFormat, ses.selectedFormat)
+  else:
+    mediaFormat = listFormat.ask("Select Format")
+
+  ses.selectedFormat = some detectFormat mediaFormat.title
+  ses.autoSelectFormat = false
+
   route.data = $$mediaFormat
   route.realWatch()
 
@@ -66,6 +81,11 @@ proc askEpisodeIdx(route: StreamRoute) =
 
 proc nextEpisode(route: StreamRoute) =
   route.session.episodeIndex += 1
+  route.session.autoSelectFormat = route.session.selectedFormat.isSome()
+
+  if route.session.autoSelectFormat:
+    route.selectAndPlay()
+
   route.setTitle()
   
 proc prevEpisode(route: StreamRoute) =
