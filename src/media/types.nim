@@ -21,7 +21,7 @@ type
     extNone, extMp4, extM3u8
 
   MediaResolution* = enum
-    rBad, rGood
+    rBad, rGood, rBest
 
   MediaFormatData* = object of RootObj
     video*: string
@@ -29,7 +29,7 @@ type
     subtitle* : Option[MediaSubtitle] = none(MediaSubtitle)
     headers*: Option[MediaHttpHeader] = none(MediaHttpHeader)  
 
-proc detectResolution*(name: string) : MediaResolution =
+proc detectResolution*(name: string) : MediaResolution {.deprecated: "Use media/resolution.detectResolution instead".} =
   const
     badResolution = @[$480, $360]
     goodResolution = @[$720, $1080]
