@@ -18,7 +18,10 @@ type
     ext*: MediaSubtitleExt = sUnkown
 
   MediaExt* = enum
-    extNone, extMp4, extM3u8
+    extNone = "",
+    extMp4 = "mp4",
+    extM3u8 = "m3u8",
+    extMkv = "mkv"
 
   MediaResolution* = enum
     rBad, rGood, rBest

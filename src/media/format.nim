@@ -28,6 +28,8 @@ proc detectExt*(name: string) : MediaExt =
     return extMp4
   if name.contains(".m3u8"):
     return extM3u8
+  if name.contains(".mkv"):
+    return extMkv
   MediaExt.extNone
 
 proc detectFormat*(title: string) : FormatIdentity =
