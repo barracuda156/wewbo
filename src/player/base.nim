@@ -35,10 +35,10 @@ proc watch*(player: Player, media: MediaFormatData, subtitle: Option[MediaSubtit
     player.setSubtitle(subtitle.get)
 
   case media.typeExt
-  of extMp4 :
+  of extMp4, extMkv:
     player.watch_mp4(media)
   of extM3u8 :
-    player.watch_m3u8(media) 
+    player.watch_m3u8(media)   
   of extNone :
     raise newException(ValueError, "Not supported format.")
 

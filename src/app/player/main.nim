@@ -44,5 +44,5 @@ proc player*(n: FullArgument) =
     quit(0)
 
   echo "Usage: "
-  echo "--test:mpv", " test MPV player"
+  echo "--test mpv", " test MPV player"
   echo "--list", " list player"
