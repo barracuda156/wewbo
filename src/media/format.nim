@@ -10,7 +10,8 @@ type FormatIdentity* = tuple[
 proc detectResolution*(name: string) : MediaResolution =
   const
     badResolution = @[$480, $520, $360]
-    goodResolution = @[$720, $1080]
+    goodResolution = @[$720]
+    bestResolution = @[$1080]
 
   let containResolution = name.findAll(re"\d+")
 
@@ -19,6 +20,8 @@ proc detectResolution*(name: string) : MediaResolution =
       return rBad
     elif goodResolution.contains(res):
       return rGood
+    elif bestResolution.contains(res):
+      return rBest
 
 proc detectExt*(name: string) : MediaExt =
   if name.endsWith(".mp4"):

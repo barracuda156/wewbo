@@ -21,7 +21,7 @@ type
     extNone, extMp4, extM3u8
 
   MediaResolution* = enum
-    rBad, rGood
+    rBad, rGood, rBest
 
   MediaFormatData* = object of RootObj
     video*: string
