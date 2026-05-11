@@ -18,23 +18,34 @@ import
 
 import  
   ../process,
-  ../media/types,
+  ../media/[format, types],
   ../tui/logger
 
 type
   FfmpegDownloaderOption* = tuple[
-    crf: int = 28,
-    fps: int = 25,
-    sub: bool = true,
+    crf = 28,
+    fps = 25,
+    sub = true,
+    keepFormat = true
   ]    
+
+  FfmpegMediaInput* = tuple[
+    media: MediaFormatData,
+    outputName: string,
+    formatIdentity: FormatIdentity
+  ]
 
   FfmpegDownloader* = ref object of CliApplication
     outdir*: string
-    targetExt: string = "mp4"
+    targetExt {.deprecated.}: string = "mp4"
     options*: FfmpegDownloaderOption
 
 proc newFfmpegDownloader*(outdir: string; options: FfmpegDownloaderOption) : FfmpegDownloader =
-  result = FfmpegDownloader(name: "ffmpeg", outdir: outdir, options: options).setUp()
+  result = FfmpegDownloader(
+    name: "ffmpeg",
+    outdir: outdir,
+    options: options
+  ).setUp()
 
 method failureHandler(ffmpeg: FfmpegDownloader, context: CLiError) =
   raise newException(ValueError, "ffmpeg is not detected on your system.")
@@ -60,7 +71,7 @@ proc setUpHeader(ffmpeg: FfmpegDownloader, headers: Option[MediaHttpHeader]) =
     if no != "" :
       ffmpeg.setHeader(chi, no)
 
-proc setGatauIniApa(ffmpeg: FfmpegDownloader) =
+proc setGatauIniApa(ffmpeg: FfmpegDownloader) {.deprecated.} =
   # Vcodec
   ffmpeg.addArg "-vcodec"
   ffmpeg.addArg "libx264"
@@ -77,7 +88,7 @@ proc setInput(ffmpeg: FfmpegDownloader, media: MediaFormatData) =
   ffmpeg.addArg "-i"
   ffmpeg.addArg media.video
 
-proc setOutput(ffmpeg: FfmpegDownloader, output: string) =
+proc setOutput(ffmpeg: FfmpegDownloader, output: string, targetExt: string) =
   proc parseTargetFile(s: string) : string = 
     const nega = ["[", "]", "/", "\\", "?", ","]
     result = s.replace(" ", "-")
@@ -88,7 +99,7 @@ proc setOutput(ffmpeg: FfmpegDownloader, output: string) =
   if not dirExists(ffmpeg.outdir) :
     createDir(ffmpeg.outdir)
   
-  ffmpeg.addArg "$#.$#" % [ffmpeg.outdir / output.parseTargetFile(), ffmpeg.targetExt]
+  ffmpeg.addArg "$#.$#" % [ffmpeg.outdir / output.parseTargetFile(), targetExt]
 
 proc handleSubtite(ffmpeg: FfmpegDownloader, media: MediaFormatData) =
   # Download and convert the sub-file to ass format.
@@ -119,7 +130,7 @@ proc handleSubtite(ffmpeg: FfmpegDownloader, media: MediaFormatData) =
 
 proc deleteTempFile {.nimcall.} = removeFile("wewbo_sub_file.ass")
 
-proc download*(ffmpeg: FfmpegDownloader, input: MediaFormatData, output: string) : int =
+proc download*(ffmpeg: FfmpegDownloader, input: MediaFormatData, output: string, targetExt: string = "mp4") : int =
   if input.subtitle.isSome and ffmpeg.options.sub:
     ffmpeg.log.info("Extracting subtitle.")
     ffmpeg.setUpHeader(input.headers)
@@ -128,12 +139,14 @@ proc download*(ffmpeg: FfmpegDownloader, input: MediaFormatData, output: string)
     ffmpeg.setUpHeader(input.headers)
     ffmpeg.setInput(input)
 
-  # ffmpeg.setGatauIniApa()
-  ffmpeg.setOutput(output)
+  if ffmpeg.options.keepFormat:
+    ffmpeg.addArg "-c"
+    ffmpeg.addArg "copy"
 
+  ffmpeg.setOutput(output, targetExt)
   ffmpeg.execute("Downloading " & output, after = some(deleteTempFile))
 
-proc downloadAll*(ffmpeg: FfmpegDownloader, inputs: openArray[MediaFormatData], outputs: openArray[string]) : seq[int] =
+proc downloadAll*(ffmpeg: FfmpegDownloader, inputs: openArray[MediaFormatData], outputs: openArray[string]) : seq[int] {.deprecated.} =
   assert inputs.len == outputs.len
 
   ffmpeg.log.info("Downloading Options: " & $ffmpeg.options)    
@@ -142,3 +155,13 @@ proc downloadAll*(ffmpeg: FfmpegDownloader, inputs: openArray[MediaFormatData], 
   for (input, output) in zip(inputs, outputs) :
     result.add(
       ffmpeg.download(input, output))
+
+proc downloadAll*(ffmpeg: FfmpegDownloader; inputs: openArray[FfmpegMediaInput]): seq[int] =
+  var targetExt: string
+
+  for (input, output, fmIdentity) in inputs:
+    if not ffmpeg.options.keepFormat:
+      targetExt = "mp4"
+    else:
+      targetExt = $fmIdentity.ext
+    result.add ffmpeg.download(input, output, targetExt)

@@ -2,7 +2,7 @@ import
   os, opt, sugar, sequtils, options,
   extractor/[all, types],
   tui/[base, logger, ask],
-  media/[types, downloader],
+  media/[types, downloader, format],
   terminal/[command, paramarg]
 
 proc download2*(f: FullArgument = nil) =
@@ -15,7 +15,7 @@ proc download2*(f: FullArgument = nil) =
     logger = useWewboLogger("Downloader")
 
   var
-    episodeTitleAndFormats: AllEpisodeFormats
+    inputs: seq[FfmpegMediaInput]
     args = OptionArgs()
   
   proc setArgsDownloader =
@@ -27,25 +27,19 @@ proc download2*(f: FullArgument = nil) =
     block ffmpegDownloaderOption:
       args.put(anime.title, "Output Directory")
       args.putBool("With Subtitle")
-      args.putRange(10, 30, "FPS", 25)
-      args.putRange(20, 30, "CRF", 28)
+      args.putBool("Keep Format")
 
   proc extract =
     if args["Output Directory"].s.dirExists():
-      raise newException(RangeDefect, "The output directory is already available. Try to change it.")
+      raise newException(RangeDefect, "The output directory is already exist. Try to change it.")
 
     var
-      episodeTitles: seq[string]
-      episodeFormats: seq[MediaFormatData]
       selectedSubtitleIndex = -1
       selectedFormatIndex = block:
         formatResolution
         .map(format => format.title)
         .find(args["Format Resolution"].s)
-      selectedFormatResolution = args["Format Resolution"].s.detectResolution()  
-
-    proc selectFormat(allFormat: seq[ExFormatData]): int {.inline.} =
-      allFormat.find allFormat.ask("Reselect Format")
+      selectedFormatResolution = args["Format Resolution"].s.detectFormat()  
 
     proc selectSubtitle(subs: seq[MediaSubtitle]): int {.inline.} =
       subs.find subs.ask("Select Subtitle")
@@ -55,15 +49,12 @@ proc download2*(f: FullArgument = nil) =
         episodeUrl = extractor.get(ept)
         allFormat = extractor.formats(episodeUrl)
         ex = extractor
+        exmedia = findMatch(allFormat, some selectedFormatResolution)
 
-      try:
-        assert block:
-          allFormat[selectedFormatIndex].title.detectResolution() ==
-          selectedFormatResolution
-        result = ex.get allFormat[selectedFormatIndex]
-      except Exception:        
-        selectedFormatIndex = selectFormat allFormat
-        result = ex.get allFormat[selectedFormatIndex]
+      block selectFormatAndFallback:
+        result = ex.get exmedia
+        selectedFormatResolution = detectFormat exmedia.title
+        logger.text("[DL] Selected Resolution: " & $selectedFormatResolution.res, color(fgGreen))
 
       if args["With Subtitle"].b: 
         let episodeSubtitles = ex.subtitles allFormat[selectedFormatIndex]
@@ -85,10 +76,7 @@ proc download2*(f: FullArgument = nil) =
 
     for ept in epds[args["Episode Range Start"].n - 1 .. args["Episode Range End"].n - 1]:
       logger.text("[DL] Extractiong format: " & ept.title, color(fgGreen))
-      episodeTitles.add ept.title
-      episodeFormats.add ept.format
-
-    episodeTitleAndFormats = (episodeTitles, episodeFormats)
+      inputs.add((ept.format, ept.title, selectedFormatResolution))
 
   proc tryExtract =
     try:
@@ -101,23 +89,24 @@ proc download2*(f: FullArgument = nil) =
   proc downloadAll =
     let
       ffmpegDownloadOption: FfmpegDownloaderOption = (
-        crf: args["CRF"].n,
-        fps: args["FPS"].n,
-        sub: args["With Subtitle"].b
+        crf: 25,
+        fps: 25,
+        sub: args["With Subtitle"].b,
+        keepFormat: args["Keep Format"].b
       )
       downloader = newFfmpegDownloader(
         outdir = args["Output Directory"].s,
         options = ffmpegDownloadOption
       )
-      outputCode = downloader.downloadAll(episodeTitleAndFormats.formats, episodeTitleAndFormats.titles)      
+      outputCode = downloader.downloadAll(inputs)      
 
     logger.info("[DL] Inspecting")
 
-    for (title, code) in zip(episodeTitleAndFormats.titles, outputCode):
+    for (input, code) in zip(inputs, outputCode):
       if code < 1:
-        logger.text("[DL] Success: " & title, color(fgGreen))
+        logger.text("[DL] Success: " & input.outputName, color(fgGreen))
       else:
-        logger.warn("[DL] Failed: " & title)  
+        logger.warn("[DL] Failed: " & input.outputName)  
 
   setArgsDownloader()
   tryExtract()
