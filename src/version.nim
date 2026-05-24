@@ -1,1 +1,1 @@
-const ver* = "1.2.0"
+const ver* = "1.2.1"
