@@ -7,14 +7,25 @@ from marshal import
   `$$`,
   to
   
-proc start*[T](route: Route[T]): void =
+proc start*[T](route: Route[T]; askAction: RouteActionProc[T] = nil): void =
   route.actions.add RouteAction[T](title: "Back")
 
-  var selectedAction: RouteAction[T]
+  var
+    selectedAction: RouteAction[T]
+    showAction: seq[RouteAction[T]]
 
   while true:
+    showAction = @[]
+    
+    if not askAction.isNil:
+      askAction(route)
+
+    for act in route.actions:
+      if not act.hidden:
+        showAction.add act
+
     try:
-      selectedAction = route.actions.ask(route.title)
+      selectedAction = showAction.ask(route.title, select = route.defaultActionIdx)
       
       if selectedAction.isNil or selectedAction.title == "Back":
         break
@@ -33,6 +44,8 @@ proc start*[T](route: Route[T]): void =
         route.logger.error("[$#] $#" % [route.logger.name, signal.msg])
       of reqClear:
         route.actions = @[]
+      of reqBack:
+        break  
       of reqExecProc:
         signal.procedure()
 
@@ -41,6 +54,9 @@ proc raiseError*[T: RouteActionError](route: Route; error: typedesc[T]; message:
 
 proc error*[T: tuple](route: Route[T]; message: string): void =
   raise RouteSignal(msg: message, request: reqBreak)
+
+
+# === SESSION ===
 
 proc setSession*[T: tuple](terlaluLama: Route[T]; defaultValue: T = T.default): void =
   terlaluLama.session = cast[ptr T](alloc0 sizeof T)
@@ -57,11 +73,27 @@ proc resetSession*[T: tuple](route: Route[T]): void =
   route.destroySession()
   route.setSession()
 
+
+# === ACTION ===
+
 proc action*[T: tuple](title: string, action: RouteActionProc[T]; data: string = ""): RouteAction[T] {.inline.} =
   result = RouteAction[T](title: title, action: action, data: data)
 
 proc addAction*[T](route: Route[T]; action: RouteAction[T]): void {.inline.} =
   route.actions.add action
+
+proc getAction*[T](route: Route[T], actionTitle: string): ptr RouteAction[T] =
+  for act in route.actions:
+    if act.title == actionTitle:
+      return addr act
+
+proc getAction*[T](route: Route[T], actionProc: RouteActionProc[T]): ptr RouteAction[T] =
+  for act in route.actions:
+    if act.action == actionProc:
+      return addr act
+
+
+# === APP ===
 
 proc app*[T: tuple](title: string; tipe: typedesc[T]): Route[T] {.inline.} =
   result = Route[T](title: title, logger: useWewboLogger(title))
@@ -71,6 +103,9 @@ proc app*[T](title: string; actions: openArray[RouteAction[T]]): Route[T] {.inli
 
   for action in actions:
     result.addAction action
+
+
+# === HELPER ===
 
 proc wrap*[T](inputs: openArray[string]; act: RouteActionProc[T]): seq[RouteAction[T]] =
   for input in inputs:

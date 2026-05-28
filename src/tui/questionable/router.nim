@@ -10,6 +10,7 @@ type
   RouteAction*[T] = ref object of Questionable
     action*: RouteActionProc[T]
     data*: string
+    hidden*: bool = false
 
   RouteActionError* = object of CatchableError
 
@@ -19,6 +20,7 @@ type
     logger*: WewboLogger    
     data*: string
     session*: ptr T
+    defaultActionIdx*: int
 
   RouteSignal* = ref object of CatchableError  
     request*: RouteRequest
@@ -26,8 +28,9 @@ type
 
   RouteRequest* = enum
     reqBreak,    
-    reqClear,
-    reqExecProc
+    reqBack,
+    reqClear {.deprecated.},
+    reqExecProc,
 
 proc setColour*(item: RouteAction; is_current: bool) : tuple[bg: BackgroundColor; fg: ForegroundColor] =
   result.bg = if is_current: bgGreen else: bgBlack
@@ -40,6 +43,6 @@ proc setColour*(item: RouteAction; is_current: bool) : tuple[bg: BackgroundColor
 proc handleExceptionKey*(item: RouteAction; tui: WewboTUI; key: Key): void =
   case key
   of Key.CtrlH, Key.Backspace:
-    raise RouteSignal(msg: "Linux Rijal", request: reqBreak)
+    raise RouteSignal(msg: "Linux Rijal", request: reqBack)
   else:
     discard
