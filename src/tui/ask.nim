@@ -16,17 +16,17 @@ proc `[]`*[T: Questionable](inputs: openArray[T]; key: string): T =
 
   raise newException(ValueError, "Value not found: '$#'" % key)
 
-proc ask*[T: Questionable](input: seq[T]; title: string = "Anto make kacamata") : T {.gcsafe.} =  
+proc ask*[T: Questionable](input: seq[T]; title = "Rijal makan nasi", select = 0) : T {.gcsafe.} =  
   let 
-    localLog = useWewboLogger("ask")
+    localLog = useWewboLogger("ask", mode=mSilent)
     page = newWewboTUI(title)
     itemsPerPage = terminalHeight() - 10
 
   localLog.info("[ASK.$#] input len: $#" % [title, $input.len])
 
   var 
-    pageEnd, pageStart: int
-    selectedContentIdx, contentIdx: int
+    pageEnd, pageStart, contentIdx: int  
+    selectedContentIdx = select
 
   proc updatePageStart =
     if selectedContentIdx < pageStart:
