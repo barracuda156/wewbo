@@ -28,6 +28,8 @@ type
     seperator*: string = ":"
     parsed: JsonNode = %*{}
 
+  InvalidArgument* = object of CatchableError
+
 proc loadArguments*(args: seq[string] = @[]) : FullArgument {.gcsafe.} =
   var rArgs = args
   
@@ -47,9 +49,9 @@ proc get(options: ArgOptions, flag: string) : ArgOption =
     if option.flag == flag :
       return option
 
-  raise newException(ValueError, "Option not found for: " & flag)  
+  raise newException(InvalidArgument, "Invalid Argument: " & flag)  
 
-proc convert*(val: string, target: AllowedValType) : JsonNode {.gcsafe.} =
+proc convert*(val: string, target: AllowedValType) : JsonNode =
   try :
     case target:
     of tInt :
@@ -74,7 +76,7 @@ proc add*(fa: FullArgument, flag: string, name: string, val: AllowedValType, def
       default: defa
     )
 
-proc option*(flag: string, name: string, val: AllowedValType, default: auto = "", help: string = "") : ArgOption {.gcsafe.} =
+proc option*(flag: string, name: string, val: AllowedValType, default: auto = "", help: string = "") : ArgOption {.deprecated.} =
   ArgOption(
     flag: flag,
     name: name,
@@ -82,6 +84,35 @@ proc option*(flag: string, name: string, val: AllowedValType, default: auto = ""
     default: convert($default, val),
     help: help
   )    
+
+proc option*[T: string|int|bool|openArray[string]](flag, name, help: string; defaultValue: T = "") : ArgOption =
+  var
+    default: JsonNode
+    valType: AllowedValType
+
+  when T is string:
+    default = newJString defaultValue
+    valType = tString
+
+  when T is int:
+    default = newJInt defaultValue
+    valType = tInt
+
+  when T is bool:
+    default = newJBool defaultValue
+    valType = tBool
+
+  when T is openArray[string]:
+    default = %(defaultValue.split(","))
+    valType = tSeq
+
+  ArgOption(
+    flag: flag,
+    name: name,
+    valType: valType,
+    default: default,
+    help: help
+  )
 
 proc add(fa: FullArgument, argOpt: ArgOption) =
   fa.options.add(argOpt)
@@ -126,7 +157,10 @@ proc parse*(fa: FullArgument) {.gcsafe.} =
       fa.flags.add arg.split(fa.seperator)[0]
       fa.parsed[faKey] = realVal
 
-    else :
+    elif arg.startsWith("-") and not flags.contains(arg):
+      raise newException(InvalidArgument, "Invalid argument: " & arg)
+
+    elif not arg.startsWith("-"):
       fa.nargs.add arg
 
 proc `[]`*(fa: FullArgument, key: string) : JsonNode {.gcsafe.} =

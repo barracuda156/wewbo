@@ -1,3 +1,5 @@
+{.deprecated.}
+
 import ../tui/[ask, logger, router, utils]
 import terminal
 
