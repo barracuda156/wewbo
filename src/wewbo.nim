@@ -1,58 +1,23 @@
 import
-  app/stream/main,
-  app/ani_dl/main,
-  app/player/main,
-  app/temp/main
+  extractor/[all, types, base]
 
-import  
-  version,
-  terminal/[command, paramarg],
-  tui/[base, logger],
-  os
+export
+  listExtractor, findMatch, getExtractor,
+  animes, episodes, formats, subtitles, get,
+  AnimeData, EpisodeData, ExFormatData, FormatResolution, AllEpisodeFormats
 
-const sourceHelp = "Select Source [kura|pahe|hime|taku]"    
+import
+  media/[types, format]
 
-let app = [
-  newSubCommand(
-    "stream", stream, @[
-      option("-s", "source", tString, "pahe", sourceHelp),
-      option("-p", "player", tString, help="Select Player [ffmpeg|mpv]"),
-      option("--mpv", "mpv_path", tString, help="mpv path"),
-      option("--ffplay", "ffplay_path", tString, help="ffplay path")
-    ], "Streaming Anime"
-  ),
-  aniDlCommand,
-  newSubCommand("player", player, help="Player Test & List", argOpts = @[
-      option("--test", "test", tBool, false, "Test Player"),
-      option("--list", "list", tBool, false, "List Player"),
-      option("-u", "url", tString, "https://huggingface.co/buckets/upi-0/example-video/resolve/nggyu.webm", "Media URL"),
-      option("-p", "player_path", tString, help="player path")      
-    ]
-  ),
-  newSubCommand("temp", tempManagement, help="Temp Management", argOpts = @[
-      option("--list", "list", tBool, false, "List Temp Files"),
-      option("--clear", "clear", tBool, false, "Clear Temp Files")
-    ]
-  ),
-  newSubCommand("sources", sourceList, help="List available source."),
-  newSubCommand("-v", (proc(f: FullArgument) = discard), help="Version info.")
-]
+export
+  detectExt, detectFormat,
+  MediaHttpHeader, MediaSubtitle, MediaSubtitleExt, MediaResolution, MediaFormatData
 
-proc main* = 
-  try:
-    echo "wewbo " & ver
-    app.start()
+import
+  tui/logger
 
-  except ref Exception:
-    if not loga.logger.isNil:
-      loga.logger.close()
-    
-    echo "wewbo " & ver
-    echo "ERROR: " & getCurrentExceptionMsg()
+export
+  detectLogMode, newWewboLogger, useWewboLogger, info, text, warn, error, exportLog,
+  WewboLogger, WewboLogMode
 
-main()
-
-if commandLineParams().contains "--capture-error":
-  if not loga.logger.isNil:
-    loga.logger.exportLog()
-    echo "Error log saved to " & getCurrentDir() / "wewbo.txt"
+when isMainModule: import app/wewbo; main()
