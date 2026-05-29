@@ -104,7 +104,7 @@ proc init*[T: BaseExtractor](
   resolution = best,
   logMode = mTui
 ) =
-  extractor.temp = newTempManager(tempDir)
+  extractor.temp = newTempManager(tempDir, logMode=logMode)
   extractor.lg = useWewboLogger(extractor.name, mode=logMode)
   extractor.userAgent = userAgent
   extractor.connection = newHttpConnection(
