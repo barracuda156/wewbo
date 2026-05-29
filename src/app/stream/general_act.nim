@@ -19,19 +19,6 @@ type
 
   StreamRoute = Route[StreamSession]  
 
-proc setTitle(route: StreamRoute): void =
-  let s = route.session
-  
-  if s.episodeIndex < 0:
-    s.episodeIndex = s.episodes.len - 1
-
-  elif s.episodeIndex > s.episodes.len - 1:
-    s.episodeIndex = 0
-
-  route.title = (
-    s.episodes[s.episodeIndex].title
-  )
-
 proc realWatch(route: StreamRoute) =
   let
     ex = route.session.ex
@@ -49,6 +36,7 @@ proc realWatch(route: StreamRoute) =
       mediaFormat.title.detectFormat.some
 
   player.watch(media)
+  route.defaultActionIdx = 1
 
 proc selectAndPlay(route: StreamRoute) =
   let
@@ -77,29 +65,52 @@ proc selectAndPlay(route: StreamRoute) =
 proc askEpisodeIdx(route: StreamRoute) =
   let s = route.session
   s.episodeIndex = s.episodes.find s.episodes.ask("Select Episode")
-  route.setTitle()
+  route.defaultActionIdx = 0
 
 proc nextEpisode(route: StreamRoute) =
   route.session.episodeIndex += 1
   route.session.autoSelectFormat = route.session.selectedFormat.isSome()
+  route.defaultActionIdx = 1
 
   if route.session.autoSelectFormat:
     route.selectAndPlay()
-
-  route.setTitle()
   
 proc prevEpisode(route: StreamRoute) =
   route.session.episodeIndex -= 1
-  route.setTitle()
+  route.session.selectedFormat = none(FormatIdentity)
+  route.defaultActionIdx = 2
 
 proc peekLog(route: StreamRoute) =
   route.logger.writeBottomText("[?] Enter to back.")
   route.logger.renderLogs()
   route.logger.tb.display()
+
   waitFor(Key.Enter)
 
 proc exportLogRoute(route: StreamRoute) =
   route.logger.exportLog()
+
+proc entryLoop(route: StreamRoute): void =
+  let
+    s = route.session
+    nextAct = route.getAction nextEpisode
+    prevAct = route.getAction prevEpisode
+    selectAct = route.getAction askEpisodeIdx
+
+  if s.episodeIndex < 0:
+    s.episodeIndex = 0
+
+  if route.session.selectedFormat.isSome:
+    nextAct.title = "Watch Next Episode"
+
+  else:
+    nextAct.title = "Next Episode"    
+
+  block:
+    prevAct.hidden = s.episodeIndex == 0        
+    nextAct.hidden = s.episodeIndex == s.episodes.len - 1
+    selectAct.hidden = s.episodes.len == 1
+    route.title = s.episodes[s.episodeIndex].title
 
 proc routeAnime(route: StreamRoute) =
   let
@@ -123,8 +134,7 @@ proc routeAnime(route: StreamRoute) =
     appAnime.setSession(ses)
     
   block exec:    
-    appAnime.setTitle()
-    appAnime.start()
+    appAnime.start(entryLoop)
 
   block afterExec:
     route.session.anime.reset()
