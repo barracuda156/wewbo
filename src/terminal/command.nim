@@ -1,11 +1,12 @@
 import
-  paramarg
+  paramarg, version
 
 import
   os,
   sequtils,
   strutils,
-  terminal
+  terminal,
+  json
 
 type
   SubCommandProc = proc(args: FullArgument) {.nimcall.}
@@ -43,17 +44,31 @@ proc perLine(li: array[2, string], pl: int = terminalWidth() div 3) : string =
     return asd[0 .. pl - 1] & " " & usd
 
 proc showHelp(subCommand: SubCommand) =
-  echo perLine([subCommand.name, subCommand.help], 16)
+  echo subCommand.help 
+  echo "\nArguments:"
 
   for arg in subCommand.args.options :
-    echo "   " & perLine([arg.flag, arg.help], 13)
+    let
+      valStr = ($arg.default).replace("\"", "")
+      right = block:
+        if valStr != "" : " (default: $#)" %  valStr
+        else: ""
+
+    echo repeat(" ", 3) & perLine([
+      arg.flag,
+      arg.help & right
+    ], 13)
+
+  echo ""
 
 proc showHelp(subCommnads: openArray[SubCommand]) =
-  echo "list command: `wewbo [command][opts][narg]`\n"
+  echo "wewbo " & ver 
+  echo "\nCommands:"
+
   for subCmd in subCommnads:
-    subCmd.showHelp()
-    echo ""
-  discard  
+    echo repeat(" ", 3) & perLine([subCmd.name, subCmd.help], 13)
+
+  echo ""
 
 proc start(subCommands: openArray[SubCommand]) =
   try:
@@ -72,14 +87,16 @@ proc start(subCommands: openArray[SubCommand]) =
     else:
       for subCmd in subCommands:
         if nuhun == subCmd.name:
-          subCmd.exec()
+          if args.len == 1 or args.contains("-h") or args.contains("--help"):
+            subCmd.showHelp() 
+          else:  
+            subCmd.exec()
           return
-  
+
       assert false
 
   except AssertionDefect:
     # Default entry
-    echo "Lu kesini?????"
     subCommands[0].exec(removeName = false)  
 
 export
