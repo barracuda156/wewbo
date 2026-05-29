@@ -114,11 +114,3 @@ proc download2*(f: FullArgument = nil) =
 
   logger.error("Task Completed")    
   illwillDeinit()
-
-let
-  arguments = @[option("-s", "source", tString, "toyo", help="Select Source")]
-  aniDlCommand* = newSubCommand("ani-dl", download2, help="Ani-DL. Anime Downloader", argOpts = arguments)
-
-when isMainModule:
-  echo "ani-dl by wewbo"
-  [aniDlCommand].start()
