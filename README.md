@@ -11,10 +11,10 @@ Wewbo is a command-line-based application that allows you to search for anime, s
 ## Sources Status
 | Name | Web | Status | Issue |
 |---------|-----------|----| -- |
-| Pahe | https://animepahe.to | ✅ | - |
 | Taku | https://otakudesu.best | ✅ | - |
 | Toyo | https://tokyoinsider.com | ✅ | - |
-| Kass | https://kaa.lt | ✅ | - |
+| Pahe | https://animepahe.to | ❌ | CF |
+| Kass | https://kaa.lt | ❌ | CF |
 | Hime  | https://hianime.to | ❌ | End of Service |
 | Kura | https://v8.kuramanime.tel | ❌ | Cryptography |
 
