@@ -9,6 +9,7 @@ import
     kuramanime,
     otakudesu,
     hianime,
+    allanime,
     tokyoinsider,
     kickass
   ]
@@ -23,6 +24,7 @@ type
 proc sukamtoList(): Table[string, ExtractorInitProc] =
   result["pahe"] = newAnimepahe
   result["hime"] = newHianime
+  result["alme"] = newAllanime
   result["kura"] = newKuramanime
   result["taku"] = newOtakudesu
   result["toyo"] = newTokyoInsider

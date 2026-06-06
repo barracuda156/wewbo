@@ -79,6 +79,8 @@ proc parseM3u8Master*(host: string, url: string, headers: MediaHttpHeader): M3u8
         resolvedUrl =
           if uri.startsWith("/"):
             "https://" & host & uri
+          elif uri.startsWith("https://"):
+            uri
           else:
             let basePath = contentUrl[0..<contentUrl.rfind("/") + 1]
             basePath & uri
