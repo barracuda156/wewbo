@@ -10,7 +10,8 @@ import
     otakudesu,
     hianime,
     tokyoinsider,
-    kickass
+    kickass,
+    moriru
   ]
 
 import
@@ -21,12 +22,13 @@ type
   ExtractorInitProc = proc(ex: var BaseExtractor) {.gcsafe.}
 
 proc sukamtoList(): Table[string, ExtractorInitProc] =
-  result["pahe"] = newAnimepahe
+  result["pahe"] = newMoriru
   result["hime"] = newHianime
   result["kura"] = newKuramanime
   result["taku"] = newOtakudesu
   result["toyo"] = newTokyoInsider
   result["kass"] = newKickass
+  result["mori"] = newMoriru
 
 const sukamto = sukamtoList()
 
