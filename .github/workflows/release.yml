@@ -75,7 +75,7 @@ jobs:
 
       - name: Build Linux binary
         run: |
-          nimble install illwill q htmlparser malebolgia zippy -y
+          nimble install illwill q htmlparser malebolgia zippy nimcrypto -y
           nim musl -d:pcre -d:openssl -d:release --mm:arc src/wewbo.nim
 
       - name: Upload release asset
@@ -109,7 +109,7 @@ jobs:
         
       - name: Build Windows Library
         run: |
-          nimble install illwill q htmlparser malebolgia zippy -y
+          nimble install illwill q htmlparser malebolgia zippy nimcrypto -y
           nim c -d:release --mm:arc --multimethods:on "src/wewbo"
 
       - name: Compress Builded Directory
