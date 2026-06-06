@@ -4,21 +4,22 @@ import std/[
   json,
   options,
   os,
-  osproc,
   strutils,
   uri
 ]
 
-import ../../base
-import ../../../http/[
+import ../base
+import http/[
   client,
-  response
+  response,
+  utils
 ]
-import ../../../media/[
+import media/[
   extractHls,
   types
 ]
-import ../../../utils
+import
+  utils, nimcrypto
 
 const
   AllanimeBase = "allanime.day"
@@ -26,9 +27,10 @@ const
   AllanimeKey = "a254aa27c410f297bd04ba33a0c0df7ff4e706bf3ae27271c6703f84e750f552"
   EpisodeQueryHash = "d405d0edd690624b66baba3068e0edc3ac90f1597d898a1ec8db4e5c43c00fec"
 
-const EpisodeEmbedGql = "query ($showId: String!, $translationType: VaildTranslationTypeEnumType!, $episodeString: String!) { episode( showId: $showId translationType: $translationType episodeString: $episodeString ) { episodeString sourceUrls }}"
-const SearchGql = "query( $search: SearchInput $limit: Int $page: Int $translationType: VaildTranslationTypeEnumType $countryOrigin: VaildCountryOriginEnumType ) { shows( search: $search limit: $limit page: $page translationType: $translationType countryOrigin: $countryOrigin ) { edges { _id name availableEpisodes __typename } }}"
-const EpisodesListGql = "query ($showId: String!) { show( _id: $showId ) { _id availableEpisodesDetail }}"
+const
+  EpisodeEmbedGql = "query ($showId: String!, $translationType: VaildTranslationTypeEnumType!, $episodeString: String!) { episode( showId: $showId translationType: $translationType episodeString: $episodeString ) { episodeString sourceUrls }}"
+  SearchGql = "query( $search: SearchInput $limit: Int $page: Int $translationType: VaildTranslationTypeEnumType $countryOrigin: VaildCountryOriginEnumType ) { shows( search: $search limit: $limit page: $page translationType: $translationType countryOrigin: $countryOrigin ) { edges { _id name availableEpisodes __typename } }}"
+  EpisodesListGql = "query ($showId: String!) { show( _id: $showId ) { _id availableEpisodesDetail }}"
 
 type
   AllanimeEX* {.final.} = ref object of BaseExtractor
@@ -39,26 +41,13 @@ proc newAllanime*(ex: var BaseExtractor) =
     name: "allanime",
     host: "api." & AllanimeBase,
     supportCompessed: false,
-    mode: getEnv("ANI_CLI_MODE", "sub"),
+    mode: "sub",
     http_headers: some(%*{
       "Content-Type": "application/json",
       "Origin": AllanimeReferer,
       "Referer": AllanimeReferer
     })
   )
-
-proc httpGet(url: string; referer: string = AllanimeReferer; userAgent: string = ""): string =
-  var headers = newHttpHeaders([
-    ("Referer", referer),
-    ("Origin", AllanimeReferer),
-    ("User-Agent", userAgent),
-    ("Accept", "*/*")
-  ])
-  var client = newHttpClient(headers = headers)
-  try:
-    result = client.getContent(url)
-  finally:
-    client.close()
 
 proc hexByte(data: string; index: int): string =
   const Hex = "0123456789abcdef"
@@ -76,37 +65,45 @@ proc decryptTobeparsed(encoded: string): string =
     return ""
 
   let
-    iv = packed.toHex(1, 12)
-    ctr = iv & "00000002"
+    ivHex = packed.toHex(1, 12)
+    ctrHex = ivHex & "00000002"
     cipherText = packed[13 ..< packed.len - 16]
-    inputName = getTempDir() / ("wewbo-allanime-" & $getCurrentProcessId() & ".bin")
 
-  inputName.writeFile(cipherText)
-  try:
-    let cmd = "openssl enc -d -aes-256-ctr -K " & AllanimeKey &
-      " -iv " & ctr & " -nosalt -nopad < " & quoteShell(inputName)
-    let (output, code) = execCmdEx(cmd)
-    if code == 0:
-      result = output
-  finally:
-    removeFile(inputName)
+  var
+    keyArray: array[32, byte]
+    ivArray: array[16, byte]
+
+  let
+    keyBytes = nimcrypto.fromHex(AllanimeKey)
+    ivBytes  = nimcrypto.fromHex(ctrHex)
+
+  # Pindahkan ke static array yang diwajibkan oleh aes256
+  copyMem(addr keyArray[0], unsafeAddr keyBytes[0], 32)
+  copyMem(addr ivArray[0], unsafeAddr ivBytes[0], 16)
+
+  # 3. Persiapan buffer untuk dekripsi
+  # Melakukan cast ke seq[byte] langsung di level memori (zero-cost)
+  let ctSeq = cast[seq[byte]](cipherText)
+  var ptSeq = newSeq[byte](ctSeq.len)
+
+  # 4. Eksekusi dekripsi secara Native
+  var ctx: CTR[aes256]
+  ctx.init(keyArray, ivArray)
+  ctx.decrypt(ctSeq, ptSeq)
+  ctx.clear() # Selalu bersihkan memory state demi keamanan
+
+  # 5. Simpan hasil langsung ke `result`
+  result = cast[string](ptSeq)
 
 proc processResponse(raw: string): string =
   if not raw.contains("\"tobeparsed\""):
     return raw
 
-  try:
-    let node = raw.parseJson()
-    if node.hasKey("data") and node["data"].hasKey("episode") and node["data"]["episode"].hasKey("tobeparsed"):
-      return decryptTobeparsed(node["data"]["episode"]["tobeparsed"].getStr())
-    if node.hasKey("tobeparsed"):
-      return decryptTobeparsed(node["tobeparsed"].getStr())
-  except JsonParsingError:
-    let encoded = raw.getBetween("\"tobeparsed\":\"", "\"")
-    if encoded.len > 0:
-      return decryptTobeparsed(encoded)
+  let
+    node = raw.parseJson()
+    tobeparsed = node["data"]["tobeparsed"].getStr()
 
-  raw
+  return decryptTobeparsed(tobeparsed)
 
 proc decodeProviderChunk(key: string): string =
   case key
@@ -215,7 +212,6 @@ proc providerId(resp, sourceName: string): string =
   for chunk in resp.splitLines():
     if chunk.startsWith(sourceName & " :"):
       return chunk.split(":", 1)[1].strip().decodeProviderId()
-  ""
 
 proc sourceLinesFromEpisode(raw: string): string =
   let clean = raw.replace("\\u002F", "/").replace("\\", "")
@@ -295,12 +291,12 @@ proc getProviderFormats(ex: AllanimeEX; providerName, providerUrl: string): seq[
     return @[]
 
   if providerUrl.contains("mp4upload"):
-    let url = httpGet(providerUrl, AllanimeReferer, ex.userAgent).extractMp4upload()
+    let url = ex.connection.req(providerUrl).to_readable().extractMp4upload()
     result.addFormat("Mp4Upload", url, "https://www.mp4upload.com", extMp4)
   elif providerUrl.contains("tools.fast4speed.rsvp"):
     result.addFormat("Yt", providerUrl, AllanimeReferer, extMp4)
   else:
-    let response = httpGet("https://" & AllanimeBase & providerUrl, AllanimeReferer, ex.userAgent)
+    let response = ex.connection.req("https://" & AllanimeBase & providerUrl).to_readable()
     var links: seq[ExFormatData]
     links.parseProviderResponse(response)
     if links.len == 0:
@@ -348,6 +344,9 @@ method episodes*(ex: AllanimeEX, url: string): seq[EpisodeData] =
   }
   let data = ex.graphQl(payload).parseJson()
   let episodeList = data["data"]["show"]["availableEpisodesDetail"].getOrDefault(ex.mode)
+  var kontol = episodeList.len - 1
+
+  result = newSeq[EpisodeData](episodeList.len)
 
   for ep in episodeList:
     let epNo =
@@ -356,10 +355,13 @@ method episodes*(ex: AllanimeEX, url: string): seq[EpisodeData] =
       of JInt: $ep.getInt()
       of JFloat: $ep.getFloat()
       else: $ep
-    result.add EpisodeData(
+
+    result[kontol] = EpisodeData(
       title: "Episode " & epNo,
       url: url & "|" & epNo
     )
+
+    kontol -= 1
 
 proc episodeResponse(ex: AllanimeEX; showId, epNo: string): string =
   let queryVars = %*{"showId": showId, "translationType": ex.mode, "episodeString": epNo}
@@ -374,40 +376,122 @@ proc episodeResponse(ex: AllanimeEX; showId, epNo: string): string =
     }
     result = ex.graphQl(payload)
 
+proc extractFormat(ex: AllanimeEX; parsed: string): seq[ExFormatData] =
+  var addictional: JsonNode = %*{
+    "source": "",
+    "referer": "",
+    "nextRequest": "",
+    "link": ""
+  }
+
+  proc extractLinks(providerId: string) : JsonNode =
+    ex.connection.req("https://" & AllanimeBase & decodeProviderId providerId).to_json()["links"]
+
+  for source in parsed.parseJson()["episode"]["sourceUrls"]:
+    let
+      url = source["sourceUrl"].getStr()
+      name = source["sourceName"].getStr()
+
+    if name.contains("mp4upload"):
+      addictional["source"] = newJString "mp4upload"
+      addictional["nextRequest"] = newJString url
+      
+      result.add ExFormatData(title: "mp4upload - Not Recommended", addictional: some addictional)
+      addictional = %*{}
+
+    elif name == "Default":
+      let
+        link = url.extractLinks()[1 - 1]["link"].getStr()
+        m3u8s = parseM3u8Master(detectHost link, link, MediaHttpHeader())
+
+      for m3u8 in m3u8s.formats:
+        addictional["source"] = newJString "Default"
+        addictional["link"] = newJString m3u8.url
+
+        result.add ExFormatData(title: "Default - " & m3u8.resolution, addictional: some addictional)
+        addictional = %*{}
+
+    elif name == "Ak":
+      var heights: seq[int]
+
+      for vids in url.extractLinks()[1 - 1]["rawUrls"]["vids"]:
+        let
+          height = vids["height"].getInt()
+          url = vids["url"].getStr()
+
+        if not heights.contains height:
+          addictional["source"] = newJString "Ak"
+          addictional["link"] = newJString url
+
+          heights.add height
+          result.add ExFormatData(title: "Ak - " & $height, addictional: some addictional)
+          addictional = %*{}
+
 method formats*(ex: AllanimeEX, url: string): seq[ExFormatData] =
   let parts = url.split("|", 1)
   if parts.len != 2:
     raise newException(ValueError, "AllAnime episode URL must contain show id and episode number")
 
-  let resp = ex.episodeResponse(parts[0], parts[1]).processResponse().sourceLinesFromEpisode()
+  let resp = ex.episodeResponse(parts[0], parts[1]).processResponse()
   let providers = [
     ("wixmp", "Default"),
-    ("youtube", "Yt-mp4"),
     ("sharepoint", "S-mp4"),
     ("mp4upload", "Mp4")
   ]
 
-  for provider in providers:
-    let id = resp.providerId(provider[1])
-    if id.len > 0:
-      result.add ex.getProviderFormats(provider[0], id)
+  return ex.extractFormat(resp)
+
+  # for provider in providers:
+  #   let id = resp.providerId(provider[1])
+  #   if id.len > 0:
+  #     result.add ex.getProviderFormats(provider[0], id)
 
 method get*(ex: AllanimeEX, data: ExFormatData): MediaFormatData =
   var
     referer = AllanimeReferer
-    ext = extMp4
+    ext = extM3u8
+    video = data.format_identifier
 
   if data.addictional.isSome:
     let addic = data.addictional.get()
-    if addic.hasKey("referer"):
-      referer = addic["referer"].getStr()
-    if addic.hasKey("ext") and addic["ext"].getStr() == $extM3u8:
-      ext = extM3u8
+
+    if addic["source"].getStr() == "mp4upload":
+      let unsolvedUrl = addic["nextRequest"].getStr()
+
+      block:
+        video = ex.connection.req(unsolvedUrl).to_readable().getBetween("src: \"", "\"")
+        referer = "https://www.mp4upload.com/"
+        ext = extMp4
+
+      echo ex.connection.req(unsolvedUrl.strip).to_readable()        
+
+    else:
+      video = addic["link"].getStr()
 
   result = MediaFormatData(
-    video: data.format_identifier,
+    video: video,
     typeExt: ext,
     headers: some(MediaHttpHeader(userAgent: ex.userAgent, referer: referer))
   )
 
 export AllanimeEX
+
+when isMainModule:
+  import tui/logger
+
+  var ex = BaseExtractor()
+
+  newAllanime(ex)
+  ex.init(logMode=mEcho)
+
+  let
+    anime = ex.get ex.animes("kaguya")[1 - 1]
+    eps = ex.get ex.episodes(anime)[^1]
+    fmts = ex.formats eps
+
+  for fm in fmts:
+    echo fm.title
+    echo (ex.get fm).video
+    echo ""
+
+  # discard fmts
