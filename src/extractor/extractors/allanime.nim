@@ -208,111 +208,6 @@ proc decodeProviderId(providerId: string): string =
 
   result = result.replace("/clock", "/clock.json").strip()
 
-proc providerId(resp, sourceName: string): string =
-  for chunk in resp.splitLines():
-    if chunk.startsWith(sourceName & " :"):
-      return chunk.split(":", 1)[1].strip().decodeProviderId()
-
-proc sourceLinesFromEpisode(raw: string): string =
-  let clean = raw.replace("\\u002F", "/").replace("\\", "")
-  for chunk in clean.replace("{", "\n").replace("}", "\n").splitLines():
-    if chunk.contains("sourceUrl\":\"") and chunk.contains("sourceName\":\""):
-      let
-        sourceUrl = chunk.getBetween("sourceUrl\":\"", "\"")
-        sourceName = chunk.getBetween("sourceName\":\"", "\"")
-      if sourceUrl.len > 0 and sourceName.len > 0:
-        result.add sourceName & " :" & sourceUrl & "\n"
-
-proc addFormat(target: var seq[ExFormatData]; title, url, referer: string; ext: MediaExt) =
-  if url.len == 0:
-    return
-
-  target.add ExFormatData(
-    title: title,
-    format_identifier: url,
-    addictional: some(%*{
-      "referer": referer,
-      "ext": $ext
-    })
-  )
-
-proc extractMp4upload(body: string): string =
-  body.getBetween("src: \"", "\"")
-
-proc parseWixmp(target: var seq[ExFormatData]; episodeLink: string) =
-  let link = episodeLink.split(">", 1)[1]
-  var extractLink = link.replace("repackager.wixmp.com/", "")
-  let urlset = extractLink.find(".urlset")
-  if urlset >= 0:
-    extractLink = extractLink[0 ..< urlset]
-
-  let marker = ",/mp4"
-  let markerPos = link.find(marker)
-  if markerPos < 0:
-    target.addFormat("wixmp", extractLink, AllanimeReferer, extMp4)
-    return
-
-  let slashBefore = link.rfind("/", 0, markerPos - 1)
-  if slashBefore < 0:
-    target.addFormat("wixmp", extractLink, AllanimeReferer, extMp4)
-    return
-
-  let qualities = link[slashBefore + 1 ..< markerPos].split(",")
-  for quality in qualities:
-    if quality.len > 0:
-      var directUrl = extractLink
-      for sibling in qualities:
-        if sibling.len > 0:
-          directUrl = directUrl.replace("," & sibling, quality)
-      target.addFormat(quality, directUrl, AllanimeReferer, extMp4)
-
-proc parseMasterM3u8(target: var seq[ExFormatData]; response, episodeLink, userAgent: string) =
-  let
-    masterUrl = episodeLink.splitLines()[0].split(">", 1)[1]
-    referer = response.getBetween("Referer\":\"", "\"")
-    header = MediaHttpHeader(userAgent: userAgent, referer: referer)
-    master = parseM3u8Master(masterUrl.split("/")[2], masterUrl, header)
-
-  for format in master.formats.sortByResolution():
-    target.addFormat(format.resolution, format.url, referer, extM3u8)
-
-proc parseProviderResponse(target: var seq[ExFormatData]; response: string) =
-  for chunk in response.replace("},{", "\n").splitLines():
-    if chunk.contains("link\":\"") and chunk.contains("resolutionStr\":\""):
-      let
-        link = chunk.getBetween("link\":\"", "\"").replace("\\/", "/").replace("\\u0026", "&")
-        resolution = chunk.getBetween("resolutionStr\":\"", "\"")
-      target.addFormat(resolution, link, AllanimeReferer, extMp4)
-    elif chunk.contains("hls\",\"url\":\"") and chunk.contains("hardsub_lang\":\"en-US"):
-      target.addFormat("hls", chunk.getBetween("hls\",\"url\":\"", "\"").replace("\\/", "/"), AllanimeReferer, extM3u8)
-
-proc getProviderFormats(ex: AllanimeEX; providerName, providerUrl: string): seq[ExFormatData] =
-  if providerUrl.len == 0:
-    return @[]
-
-  if providerUrl.contains("mp4upload"):
-    let url = ex.connection.req(providerUrl).to_readable().extractMp4upload()
-    result.addFormat("Mp4Upload", url, "https://www.mp4upload.com", extMp4)
-  elif providerUrl.contains("tools.fast4speed.rsvp"):
-    result.addFormat("Yt", providerUrl, AllanimeReferer, extMp4)
-  else:
-    let response = ex.connection.req("https://" & AllanimeBase & providerUrl).to_readable()
-    var links: seq[ExFormatData]
-    links.parseProviderResponse(response)
-    if links.len == 0:
-      return @[]
-
-    if links[0].format_identifier.contains("repackager.wixmp.com"):
-      var line = links[0].title & " >" & links[0].format_identifier
-      result.parseWixmp(line)
-    elif links[0].format_identifier.contains("master.m3u8"):
-      result.parseMasterM3u8(response, links[0].title & " >" & links[0].format_identifier, ex.userAgent)
-    else:
-      result = links
-
-  for format in result.mitems:
-    format.title = providerName & " " & format.title
-
 proc graphQl(ex: AllanimeEX; payload: JsonNode): string =
   ex.connection.req("/api", mthod = HttpPost, payload = $payload).to_readable()
 
@@ -433,18 +328,8 @@ method formats*(ex: AllanimeEX, url: string): seq[ExFormatData] =
     raise newException(ValueError, "AllAnime episode URL must contain show id and episode number")
 
   let resp = ex.episodeResponse(parts[0], parts[1]).processResponse()
-  let providers = [
-    ("wixmp", "Default"),
-    ("sharepoint", "S-mp4"),
-    ("mp4upload", "Mp4")
-  ]
 
   return ex.extractFormat(resp)
-
-  # for provider in providers:
-  #   let id = resp.providerId(provider[1])
-  #   if id.len > 0:
-  #     result.add ex.getProviderFormats(provider[0], id)
 
 method get*(ex: AllanimeEX, data: ExFormatData): MediaFormatData =
   var
