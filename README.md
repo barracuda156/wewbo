@@ -31,7 +31,7 @@ wewbo stream [anime title]
 
 ### Downloading
 ```bash
-wewbo dl [anime title]
+wewbo ani-dl [anime title]
 ```
 ### Usage Examples
 
