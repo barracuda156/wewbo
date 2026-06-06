@@ -9,7 +9,7 @@ const
 
 let  
   commands = @[
-    option("-s", "source", "Select Source", "toyo"),
+    option("-s", "source", "Select Source", "mori"),
     option("-p", "player", "Select Player"),
     option("--mpv", "mpv_path", "MPV Path"),
     option("--ffplay", "ffplay_path", "ffplay path")
