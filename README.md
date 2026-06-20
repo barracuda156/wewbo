@@ -12,13 +12,8 @@ Wewbo is a command-line-based application that allows you to search for anime, s
 | Name | Web | Status | Issue |
 |---------|-----------|----| -- |
 | Mori | https://miruro.tv | ✅ | - |
-| Toyo | https://tokyoinsider.com | ✅ | - |
 | Alme | https://allanime.day | ✅ | - |
 | Taku | https://otakudesu.best | ✅ | - |
-| Pahe | https://animepahe.to | ❌ | CF. Use Mori instead. |
-| Kass | https://kaa.lt | ❌ | CF |
-| Hime  | https://hianime.to | ❌ | End of Service |
-| Kura | https://v8.kuramanime.tel | ❌ | Cryptography |
 
 ## How to Use
 
