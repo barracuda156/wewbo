@@ -49,7 +49,7 @@ proc ask*[T: Questionable](input: seq[T]; title = "Rijal makan nasi", select = 0
   renderItems()
 
   if input.len == 1:
-    return result
+    return input[0]
 
   while true:
     var key = getKey()
