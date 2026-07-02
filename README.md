@@ -1,5 +1,9 @@
 # wewbo
 An interactive terminal application for searching and watching anime from various streaming sources. [Install Here](#install)
+
+> [!IMPORTANT]  
+> This project is currently readonly. Development will continue at an unknown time. You can still use it with some sources that are still active. Some sources may no longer be active until they use Cloudflare. Thanks for all your support! Hopefully we can meet again in version 2.
+
 <p align="center">
   <img width="75%" src="https://raw.githubusercontent.com/upi-0/wewbo/refs/heads/main/asset/tuiPreview.png">
 </p>
