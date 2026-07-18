@@ -92,11 +92,21 @@ proc start(app: CliApplication, process: Process, message: string, checkup: int 
     place.sendLog()
 
   proc handleOutputBuffer(strm: Stream; place: var string) =
-    try:
-      if isUnix: strm.handleOutputBufferUnix(place)
-      else: strm.handleOutputBufferWin(place)
-    except:
-      discard # Jangan males napa lu ah
+    # Drain up to a batch of lines per tick, not just one -- ffmpeg can
+    # emit far more than one line per checkup tick (its startup banner
+    # alone is a dozen-plus lines), and reading only one per tick meant
+    # most of its actual output, including any fatal error, was silently
+    # left behind in the pipe and never reached the log at all.
+    # (atEnd() can't be used to detect "nothing buffered right now" here --
+    # pipes aren't seekable, and the POSIX FileHandleStream's atEnd does an
+    # lseek, which is meaningless on a pipe.)
+    const maxLinesPerTick = 200
+    for _ in 1 .. maxLinesPerTick:
+      try:
+        if isUnix: strm.handleOutputBufferUnix(place)
+        else: strm.handleOutputBufferWin(place)
+      except:
+        break
 
   # processLogger.info("ARGS: " & $app.args)
   app.logginArg(processLogger)
