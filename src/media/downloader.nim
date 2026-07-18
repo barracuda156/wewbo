@@ -91,6 +91,13 @@ proc setInput(ffmpeg: FfmpegDownloader, media: MediaFormatData) =
   # Disable strict extension checking
   ffmpeg.addArg "-extension_picky"
   ffmpeg.addArg "0"
+  # ffmpeg's file protocol separately blocks opening local files whose
+  # extension isn't in its own "common multimedia" allowlist (e.g. the
+  # AES-128 key.bin mirrorHlsVod writes for encrypted streams) -- distinct
+  # from allowed_segment_extensions/extension_picky above, which only cover
+  # HLS segment naming, not generic file opens.
+  ffmpeg.addArg "-allowed_extensions"
+  ffmpeg.addArg "ALL"
   # Enable crypto protocol for AES-128 decryption
   ffmpeg.addArg "-protocol_whitelist"
   ffmpeg.addArg "file,http,https,tcp,tls,crypto"
