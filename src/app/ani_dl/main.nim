@@ -13,11 +13,15 @@ proc download2*(f: FullArgument = nil) =
     epds = extractor.episodes extractor.get anime
     formatResolution = extractor.formats extractor.get epds[0]
     logger = useWewboLogger("Downloader")
+    outputOverride = f["output"].getStr()
+    defaultOutputDir =
+      if outputOverride.len > 0: outputOverride
+      else: getHomeDir() / "wewbo" / anime.title.sanitizeFileName()
 
   var
     inputs: seq[FfmpegMediaInput]
     args = OptionArgs()
-  
+
   proc setArgsDownloader =
     let epdsLen = epds.len
     args.putRange(1, epdsLen, "Episode Range Start", 1)
@@ -25,7 +29,7 @@ proc download2*(f: FullArgument = nil) =
     args.putEnum(formatResolution, "Format Resolution")
 
     block ffmpegDownloaderOption:
-      args.put(anime.title, "Output Directory")
+      args.put(defaultOutputDir, "Output Directory")
       args.putBool("With Subtitle")
       args.putBool("Keep Format")
 

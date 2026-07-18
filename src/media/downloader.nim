@@ -97,18 +97,18 @@ proc setInput(ffmpeg: FfmpegDownloader, media: MediaFormatData) =
   ffmpeg.addArg "-i"
   ffmpeg.addArg media.video
 
-proc setOutput(ffmpeg: FfmpegDownloader, output: string, targetExt: string) =
-  proc parseTargetFile(s: string) : string = 
-    const nega = ["[", "]", "/", "\\", "?", ","]
-    result = s.replace(" ", "-")
-    
-    for ne in nega:
-      result = result.replace(ne)
+proc sanitizeFileName*(s: string) : string =
+  const nega = ["[", "]", "/", "\\", "?", ",", ":"]
+  result = s.replace(" ", "-")
 
+  for ne in nega:
+    result = result.replace(ne)
+
+proc setOutput(ffmpeg: FfmpegDownloader, output: string, targetExt: string) =
   if not dirExists(ffmpeg.outdir) :
     createDir(ffmpeg.outdir)
-  
-  ffmpeg.addArg "$#.$#" % [ffmpeg.outdir / output.parseTargetFile(), targetExt]
+
+  ffmpeg.addArg "$#.$#" % [ffmpeg.outdir / output.sanitizeFileName(), targetExt]
 
 proc handleSubtite(ffmpeg: FfmpegDownloader, media: MediaFormatData) =
   # Download and convert the sub-file to ass format.

@@ -9,7 +9,8 @@ const
 
 let  
   commands = @[
-    option("-s", "source", "Select Source", "toyo")
+    option("-s", "source", "Select Source", "mori"),
+    option("-o", "output", "Output directory (default: ~/wewbo/<anime title>)", "")
   ]
   anidlCommand* = newSubCommand(
     name = name,
