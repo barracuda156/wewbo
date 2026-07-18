@@ -3,7 +3,7 @@
 ## Cloudflare's bot detection. Only used where the plain Nim httpclient
 ## gets blocked outright.
 
-import std/[os, osproc, strutils, oids, uri, sequtils]
+import std/[os, osproc, strutils, oids, uri, sequtils, streams]
 
 type
   ImpersonateError* = object of CatchableError
@@ -38,7 +38,19 @@ proc impersonatedGet*(
     args.add(k & ": " & v)
   args.add url
 
-  let output = execProcess(bin, args = args, options = {poUsePath})
+  # execProcess()/readLine() read line-by-line and re-join with "\n",
+  # silently collapsing any CR-LF to LF and mangling bare CR bytes -- fine
+  # for text, but this reads binary segment/key data (mirrorHlsVod), and
+  # any 0x0D or 0x0D 0x0A byte pair inside that data would get corrupted.
+  # That was actually happening: downloaded HLS segments decrypted into
+  # corrupt packets partway through a video, exactly the kind of scattered
+  # corruption line-based reassembly of binary data would cause. Read raw
+  # bytes via the process stream instead.
+  let process = startProcess(bin, args = args, options = {poUsePath})
+  let output = process.outputStream().readAll()
+  discard process.waitForExit()
+  process.close()
+
   let marker = "\n__WEWBO_STATUS__"
   let markerPos = output.rfind(marker)
 
