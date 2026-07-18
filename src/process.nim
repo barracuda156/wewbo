@@ -60,7 +60,12 @@ proc setUp[T: CliApplication](app: T) : T =
 proc start(app: CliApplication, process: Process, message: string, checkup: int = 50): int =
   let
     isUnix = defined(linux) or defined(macosx) or defined(macos)
-    processLogger = newWewboLogger(message, mode = app.logMode)
+    # Join the same shared log buffer everything else (extractors, the
+    # Downloader logger, etc.) writes to via useWewboLogger -- otherwise
+    # this logger's own private .logs is empty of everything but ffmpeg's
+    # own output, even though it visually appears alongside earlier lines
+    # in the TUI (which just renders whatever's currently on screen).
+    processLogger = newWewboLogger(message, konten = some(addr tlog.loga.content), mode = app.logMode)
 
   var
     outputBuffer: string
