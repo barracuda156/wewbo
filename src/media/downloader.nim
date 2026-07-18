@@ -85,6 +85,15 @@ proc setGatauIniApa(ffmpeg: FfmpegDownloader) {.deprecated.} =
   ffmpeg.addArg $ffmpeg.options.fps
 
 proc setInput(ffmpeg: FfmpegDownloader, media: MediaFormatData) =
+  # Allow .jpg files as HLS segments (for encrypted streams)
+  ffmpeg.addArg "-allowed_segment_extensions"
+  ffmpeg.addArg "jpg,ts,mpegts"
+  # Disable strict extension checking
+  ffmpeg.addArg "-extension_picky"
+  ffmpeg.addArg "0"
+  # Enable crypto protocol for AES-128 decryption
+  ffmpeg.addArg "-protocol_whitelist"
+  ffmpeg.addArg "file,http,https,tcp,tls,crypto"
   ffmpeg.addArg "-i"
   ffmpeg.addArg media.video
 

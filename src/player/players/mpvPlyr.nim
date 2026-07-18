@@ -26,7 +26,18 @@ method setSubtitle(mpv: MpvPL, subtitle: MediaSubtitle) {.inline.} =
 method watch_mp4(mpv: MpvPL, media: MediaFormatData) =
   mpv.args.add "--fullscreen"
   mpv.args.add "--ytdl=no"
-  mpv.args.add "--http-header-fields=" & mpv.headerString
+  # NOTE: MPV has issues with comma-separated lavf options on macOS
+  # For encrypted HLS with .jpg segments (like animepahe), use ffplay instead
+  # The following options work in ffmpeg/ffplay but not MPV:
+  # -allowed_segment_extensions jpg,ts,mpegts -extension_picky 0
+  # Set referrer for HTTP requests
+  mpv.args.add "--referrer=https://kwik.cx/"
+  # Remove trailing comma from headerString
+  var headers = mpv.headerString
+  if headers.len > 0 and headers[^1] == ',':
+    headers = headers[0 ..< headers.len - 1]
+  if headers.len > 0:
+    mpv.args.add "--http-header-fields=" & headers
   mpv.args.add media.video
  
 method watch_m3u8(mpv: MpvPL, media: MediaFormatData) = 

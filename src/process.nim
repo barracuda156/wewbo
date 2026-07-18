@@ -37,16 +37,16 @@ proc logginArg(app: CliApplication; log = app.log) : void =
   log.text("APP_NAME: " & app.name, color(fgYellow))
   log.text("APP_PATH: " & app.path, color(fgYellow))
   log.text("APP_ARGS:", color(fgYellow))
-  
+
   for arg in app.args:
-    log.text("- " & arg, color(fgYellow))  
+    log.text("- " & arg, color(fgYellow))
 
 proc check(app: CliApplication) : bool =
   app.path = app.name.findExe()
   app.path.fileExists()
 
 method specialLine(cli: CliApplication; text: string) : bool {.gcsafe, base.} =
-  text.contains("\r") 
+  text.contains("\r")
 
 proc setUp[T: CliApplication](app: T) : T =
   app.log = useWewboLogger(app.name, mode = app.logMode)
@@ -55,37 +55,37 @@ proc setUp[T: CliApplication](app: T) : T =
     app.failureHandler(erCommandNotFound)
     quit(1)
 
-  app    
+  app
 
-proc start(app: CliApplication, process: Process, message: string, checkup: int = 50): int =  
+proc start(app: CliApplication, process: Process, message: string, checkup: int = 50): int =
   let
-    isLinux = defined(linux)
+    isUnix = defined(linux) or defined(macosx) or defined(macos)
     processLogger = newWewboLogger(message, mode = app.logMode)
 
   var
     outputBuffer: string
     stream = process.peekableOutputStream()
 
-  proc sendLog(line: string) =    
+  proc sendLog(line: string) =
     if app.specialLine(line):
       processLogger.setLineBuffer(processLogger.tb.height - 3, " " & line.strip, bg=bgWhite, fg=fgBlack)
-    
-    elif line != "":  
+
+    elif line != "":
       processLogger.info(line)
 
   proc handleOutputBufferWin(strm: Stream; place: var string) =
     sendLog strm.readLine()
 
-  proc handleOutputBufferLinux(strm: Stream; place: var string) =
-    place = stream.readLine()  
+  proc handleOutputBufferUnix(strm: Stream; place: var string) =
+    place = stream.readLine()
     place.sendLog()
 
   proc handleOutputBuffer(strm: Stream; place: var string) =
     try:
-      if isLinux: strm.handleOutputBufferLinux(place)
+      if isUnix: strm.handleOutputBufferUnix(place)
       else: strm.handleOutputBufferWin(place)
     except:
-      discard # Jangan males napa lu ah  
+      discard # Jangan males napa lu ah
 
   # processLogger.info("ARGS: " & $app.args)
   app.logginArg(processLogger)
@@ -94,13 +94,13 @@ proc start(app: CliApplication, process: Process, message: string, checkup: int 
     if process.running():
       stream.handleOutputBuffer(outputBuffer)
       checkup.sleep()
-      
+
     else:
       stream.handleOutputBuffer(outputBuffer)
       checkup.sleep()
       processLogger.stop()
 
-      return process.peekExitCode()  
+      return process.peekExitCode()
 
 proc addArg(app: CliApplication, arg: string) =
   app.args.add arg
@@ -113,7 +113,7 @@ proc execute(
 ) : int =
   let process = startProcess(app.path.findExe(), ".", app.args)
   app.logginArg()
-  
+
   result = app.start(process, message)
 
   if clearArgs :

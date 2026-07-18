@@ -18,7 +18,8 @@ proc loaderPlayerProcs: LoaderPlayerProcs =
 
 const
   playerLoader = loaderPlayerProcs()
-  playerList* = playerLoader.keys.toSeq()
+  # Explicitly order ffplay first for better encrypted HLS support (especially on macOS)
+  playerList* = @["ffplay", "mpv"]
   players* {.deprecated.} = playerList
 
 proc getPlayer*(name = "mpv"; playerPath: string = ""; setPlayer = true; mode = mTui): Player =

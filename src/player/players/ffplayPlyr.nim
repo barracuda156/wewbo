@@ -21,6 +21,15 @@ method setReferer(ffplay: FfplayPL, val: string) =
   ffplay.setHeader("Referer", val)
 
 method watch_mp4(ffplay: FfplayPL, media: MediaFormatData) =
+  # Allow .jpg files as HLS segments (for encrypted streams)
+  ffplay.args.add "-allowed_segment_extensions"
+  ffplay.args.add "jpg,ts,mpegts"
+  # Disable strict extension checking
+  ffplay.args.add "-extension_picky"
+  ffplay.args.add "0"
+  # Enable crypto protocol for AES-128 decryption
+  ffplay.args.add "-protocol_whitelist"
+  ffplay.args.add "file,http,https,tcp,tls,crypto"
   ffplay.args.add "-i"
   ffplay.args.add media.video
 

@@ -36,7 +36,7 @@ method animes*(ex: AnimepaheEX, title: string) : seq[AnimeData] =
       url: ex.connection.normalize_url(
         "/anime/" & anime["session"].getStr()
       )
-    )     
+    )
 
 proc get_by_index(ex: AnimepaheEX, session: string, index: int = 1, sort: string = "asc") : tuple[all: JsonNode, total: int] =
   let
@@ -56,7 +56,7 @@ method episodes*(ex: AnimepaheEX, url: string) : seq[EpisodeData] =
     episodes = ells.all
     total_eps = ells.total
 
-  if total_eps <= 30 :    
+  if total_eps <= 30 :
     for eps in episodes :
       result.add EpisodeData(
         title: "Episode " & $eps["episode"].getInt(),
@@ -137,7 +137,7 @@ proc force_get_index(script: string, vault: string) : string =
     let start = script.find(vaultPattern) + vaultPattern.len
     let endPos = start + 2
     let index = script[start ..< endPos]
-    
+
     if index.allCharsInSet({'0'..'9'}):
       return index
     else:
@@ -147,21 +147,21 @@ proc force_get_index(script: string, vault: string) : string =
       let start = script.find("m3u8|uwu|") + 9 + 65
       let endPos = start + 2
       var index = script[start ..< endPos]
-      
+
       if index.allCharsInSet({'0'..'9'}):
         return index
-      
+
       let start2 = script.find("|source|") + 8
       let endPos2 = start2 + 2
       index = script[start2 ..< endPos2]
-      
+
       if index.allCharsInSet({'0'..'9'}):
         return index
-      
+
       let start3 = script.find("/H/") + 3
       let endPos3 = start3 + 2
       index = script[start3 ..< endPos3]
-      
+
       return index
     except:
       raise newException(ValueError, "Index not found")
@@ -173,18 +173,18 @@ proc get_m3u8_id(script: string) : string =
 
   result = script[startt .. endd]
 
-proc get_m3u8_data(url: string, page: XmlNode) : array[8, string] =
+proc get_m3u8_data(url: string, page: XmlNode) : tuple[vault: string, host: string, index: string, m3u8_id: string] =
   let
     base_uri = page.select("link")[2].attr("href")
     script = page.select("script")[^1].innerText
     vault = base_uri.vault()
 
-  result = [
-    "vault", vault,
-    "host", base_uri.host(vault),
-    "index", script.force_get_index(vault),
-    "m3u8_id", script.get_m3u8_id()
-  ]
+  result = (
+    vault: vault,
+    host: base_uri.host(vault),
+    index: script.force_get_index(vault),
+    m3u8_id: script.get_m3u8_id()
+  )
 
 method get*(ex: AnimepaheEX, format: ExFormatData) : MediaFormatData =
   ex.info("Get Format Information")
@@ -192,7 +192,14 @@ method get*(ex: AnimepaheEX, format: ExFormatData) : MediaFormatData =
     format_page = ex.connection.req(format.format_identifier).to_selector()
     m3u8_data = format.format_identifier.get_m3u8_data(format_page)
 
-  result.video = "https://vault-$vault.$host.top/stream/$vault/$index/$m3u8_id/uwu.m3u8" % m3u8_data
+  result.video = "https://vault-$#.$#.top/stream/$#/$#/$#/uwu.m3u8" % [
+    m3u8_data.vault,
+    m3u8_data.host,
+    m3u8_data.vault,
+    m3u8_data.index,
+    m3u8_data.m3u8_id
+  ]
+
   result.typeExt = extM3u8
   result.headers = some(MediaHttpHeader(referer: "https://kwik.cx/"))
 
