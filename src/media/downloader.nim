@@ -200,5 +200,15 @@ proc downloadAll*(ffmpeg: FfmpegDownloader; inputs: openArray[FfmpegMediaInput])
     if not ffmpeg.options.keepFormat:
       targetExt = "mp4"
     else:
+      # fmIdentity.ext is detected from the format *title* string (e.g.
+      # "480p - SomeFansub"), which only happens to contain a recognizable
+      # extension for some sources -- for mori it never does, so this was
+      # always "" ("extNone"), producing an output filename with no
+      # extension at all ("...Collar." -- ffmpeg then can't infer a muxer
+      # and fails outright rather than downloading anything). Fall back to
+      # mp4, same as the not-keepFormat case, rather than emit an
+      # extensionless file.
       targetExt = $fmIdentity.ext
+      if targetExt.len == 0:
+        targetExt = "mp4"
     result.add ffmpeg.download(input, output, targetExt)
