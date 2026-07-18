@@ -8,9 +8,9 @@ proc tempManagement*(n: FullArgument) =
   let temp = newTempManager(getTempDir(), mEcho)
   
   if n["list"].getBool():
-    for file in temp.all:
-      echo file
-    quit(0)  
+    for (path, _) in temp.all:
+      echo path
+    quit(0)
 
   if n["clear"].getBool():
     temp.clearAll()
