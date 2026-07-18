@@ -139,12 +139,21 @@ proc handleSubtite(ffmpeg: FfmpegDownloader, media: MediaFormatData) =
 
 proc deleteTempFile {.nimcall.} = removeFile("wewbo_sub_file.ass")
 
+proc deleteHlsMirror(mirrorDir: string) =
+  # mirrorHlsVod() (src/http/impersonate.nim) downloads the whole VOD into
+  # its own wewbo-hls-<oid> dir before handing it to ffmpeg; nothing else
+  # ever reads it again once ffmpeg is done, so it's safe to remove here.
+  if mirrorDir.extractFilename.startsWith("wewbo-hls-"):
+    removeDir(mirrorDir)
+
 proc download*(ffmpeg: FfmpegDownloader, input: MediaFormatData, output: string, targetExt: string = "mp4") : int =
+  let hlsMirrorDir = input.video.parentDir()
+
   if input.subtitle.isSome and ffmpeg.options.sub:
     ffmpeg.log.info("Extracting subtitle.")
     ffmpeg.setUpHeader(input.headers)
     ffmpeg.handleSubtite(input)
-  else:  
+  else:
     ffmpeg.setUpHeader(input.headers)
     ffmpeg.setInput(input)
 
@@ -153,7 +162,10 @@ proc download*(ffmpeg: FfmpegDownloader, input: MediaFormatData, output: string,
     ffmpeg.addArg "copy"
 
   ffmpeg.setOutput(output, targetExt)
-  ffmpeg.execute("Downloading " & output, after = some(deleteTempFile))
+  ffmpeg.execute("Downloading " & output, after = some(proc () =
+    deleteTempFile()
+    deleteHlsMirror(hlsMirrorDir)
+  ))
 
 proc downloadAll*(ffmpeg: FfmpegDownloader, inputs: openArray[MediaFormatData], outputs: openArray[string]) : seq[int] {.deprecated.} =
   assert inputs.len == outputs.len

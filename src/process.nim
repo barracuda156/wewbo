@@ -11,7 +11,7 @@ import
   illwill
 
 type
-  AfterExecuteProc = proc() {.gcsafe, nimcall.}
+  AfterExecuteProc = proc() {.gcsafe, closure.}
   SpecialLineProc* = proc(line: string) : bool {.gcsafe, nimcall.}
 
   CliApplication = ref object of RootObj
