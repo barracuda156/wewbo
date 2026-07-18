@@ -41,8 +41,10 @@ proc newMoriru*(ex: var BaseExtractor) =
   )
 
 proc pipeReq(ex: MoriruEX; encoded: string): string =
+  # Bare miruro.tv 302-redirects (via Cloudflare) to www.miruro.tv; hitting
+  # www. directly avoids that hop and is what actually serves the pipe.
   impersonatedGet(
-    "https://" & ex.host & "/api/secure/pipe?e=" & encoded,
+    "https://www." & ex.host & "/api/secure/pipe?e=" & encoded,
     headers = IMPERSONATE_HEADERS
   )
 
