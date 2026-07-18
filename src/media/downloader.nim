@@ -162,10 +162,15 @@ proc download*(ffmpeg: FfmpegDownloader, input: MediaFormatData, output: string,
     ffmpeg.addArg "copy"
 
   ffmpeg.setOutput(output, targetExt)
-  ffmpeg.execute("Downloading " & output, after = some(proc () =
-    deleteTempFile()
+  result = ffmpeg.execute("Downloading " & output, after = some(AfterExecuteProc(deleteTempFile)))
+
+  # Only clean up the mirror on success -- on failure it's the only evidence
+  # of what curl-impersonate actually fetched, useful for debugging why
+  # ffmpeg choked on it.
+  if result == 0:
     deleteHlsMirror(hlsMirrorDir)
-  ))
+  else:
+    ffmpeg.log.warn("Download failed, HLS mirror kept for inspection: " & hlsMirrorDir)
 
 proc downloadAll*(ffmpeg: FfmpegDownloader, inputs: openArray[MediaFormatData], outputs: openArray[string]) : seq[int] {.deprecated.} =
   assert inputs.len == outputs.len

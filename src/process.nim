@@ -11,7 +11,7 @@ import
   illwill
 
 type
-  AfterExecuteProc = proc() {.gcsafe, closure.}
+  AfterExecuteProc* = proc() {.gcsafe, closure.}
   SpecialLineProc* = proc(line: string) : bool {.gcsafe, nimcall.}
 
   CliApplication = ref object of RootObj
@@ -98,9 +98,16 @@ proc start(app: CliApplication, process: Process, message: string, checkup: int 
     else:
       stream.handleOutputBuffer(outputBuffer)
       checkup.sleep()
+
+      let exitCode = process.peekExitCode()
+      if exitCode != 0:
+        let logFile = getTempDir() / (app.name & "-failure.log")
+        processLogger.exportLog(logFile)
+        app.log.warn("$# exited with code $#, full output saved to $#" % [app.name, $exitCode, logFile])
+
       processLogger.stop()
 
-      return process.peekExitCode()
+      return exitCode
 
 proc addArg(app: CliApplication, arg: string) =
   app.args.add arg
@@ -128,4 +135,5 @@ export
   check,
   setUp,
   addArg,
-  execute
+  execute,
+  AfterExecuteProc
