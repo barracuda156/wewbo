@@ -108,6 +108,10 @@ proc setOutput(ffmpeg: FfmpegDownloader, output: string, targetExt: string) =
   if not dirExists(ffmpeg.outdir) :
     createDir(ffmpeg.outdir)
 
+  # Without -y, ffmpeg prompts on stdin when the output file already exists
+  # (e.g. re-running into a previous download's directory) and hangs forever,
+  # since nothing feeds its stdin. Always overwrite instead.
+  ffmpeg.addArg "-y"
   ffmpeg.addArg "$#.$#" % [ffmpeg.outdir / output.sanitizeFileName(), targetExt]
 
 proc handleSubtite(ffmpeg: FfmpegDownloader, media: MediaFormatData) =

@@ -34,9 +34,6 @@ proc download2*(f: FullArgument = nil) =
       args.putBool("Keep Format")
 
   proc extract =
-    if args["Output Directory"].s.dirExists():
-      raise newException(RangeDefect, "The output directory is already exist. Try to change it.")
-
     var
       selectedSubtitleIndex = -1
       selectedFormatIndex = block:

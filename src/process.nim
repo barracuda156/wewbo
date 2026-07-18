@@ -101,7 +101,12 @@ proc start(app: CliApplication, process: Process, message: string, checkup: int 
 
       let exitCode = process.peekExitCode()
       if exitCode != 0:
-        let logFile = getTempDir() / (app.name & "-failure.log")
+        # A fixed, predictable path -- the TUI truncates long lines to pane
+        # width, so a path containing a temp-dir's random component would be
+        # unreadable/uncopyable from the log line that reports it.
+        let logDir = getHomeDir() / "wewbo"
+        createDir(logDir)
+        let logFile = logDir / "last_run.log"
         processLogger.exportLog(logFile)
         app.log.warn("$# exited with code $#, full output saved to $#" % [app.name, $exitCode, logFile])
 
