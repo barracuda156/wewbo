@@ -73,7 +73,13 @@ proc start(app: CliApplication, process: Process, message: string, checkup: int 
 
   proc sendLog(line: string) =
     if app.specialLine(line):
+      # Still recorded via saveLine below -- specialLine output (e.g.
+      # ffmpeg's \r-updated progress line) is usually spam, but the actual
+      # fatal error can land on a line that also matches (e.g. containing
+      # "time="), so it must still reach the exportable log, just not the
+      # scrolling live view.
       processLogger.setLineBuffer(processLogger.tb.height - 3, " " & line.strip, bg=bgWhite, fg=fgBlack)
+      processLogger.saveLine(line)
 
     elif line != "":
       processLogger.info(line)
@@ -129,7 +135,6 @@ proc execute(
   after: Option[AfterExecuteProc] = none(AfterExecuteProc)
 ) : int =
   let process = startProcess(app.path.findExe(), ".", app.args)
-  app.logginArg()
 
   result = app.start(process, message)
 

@@ -143,6 +143,12 @@ proc renderLogs*(l: WewboLogger) =
 template addLog(l: WewboLogger; text: string) =
   l.logAddress()[].add(text)
 
+proc saveLine*(l: WewboLogger; text: string; styleColor: WewboLogStyle = WEWBO_DEFAULT_STYLE) =
+  ## Records a line into the exportable log without touching the live
+  ## display -- for callers (like a scrolling \r progress line) that render
+  ## themselves elsewhere and would otherwise never reach exportLog/logz.
+  l.addLog(text & "|||" & $$styleColor)
+
 proc render(l: WewboLogger; text: string; styleColor: WewboLogStyle = WEWBO_DEFAULT_STYLE) =
   l.addLog(text & "|||" & $$styleColor)
   case l.mode
