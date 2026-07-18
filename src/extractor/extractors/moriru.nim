@@ -1,7 +1,7 @@
 import ../base
 
 import
-  http/[client, response]
+  http/impersonate
 
 import base64, strutils, json, options
 
@@ -18,10 +18,32 @@ const
   LIST_FORMAT_TEMPLATE = """{"path":"sources","method":"GET","query":{"episodeId":"$#","provider":"kiwi","category":"sub","anilistId":$#},"body":null,"version":"0.2.0"}"""
   PROVIDER = "kiwi" # Gua gabisa move on dari animepahe.
 
+  # Miruro's pipe endpoint sits behind Cloudflare and rejects plain
+  # httpclient/OpenSSL requests outright. curl-impersonate replicates a real
+  # Chrome TLS fingerprint (JA3/JA4), which is what actually gets through;
+  # the same-origin headers below mirror what a real page load sends.
+  # See: https://github.com/walterwhite-69/Miruro-API/commit/dfb38a646e28afa5b6f14e4b4d9d542b2bf894df
+  IMPERSONATE_HEADERS = [
+    ("Referer", "https://www.miruro.tv/"),
+    ("Origin", "https://www.miruro.tv"),
+    ("Sec-Fetch-Site", "same-origin"),
+    ("Sec-Fetch-Mode", "cors"),
+    ("Sec-Fetch-Dest", "empty"),
+    ("Sec-Ch-Ua", "\"Chromium\";v=\"124\", \"Not-A.Brand\";v=\"99\", \"Google Chrome\";v=\"124\""),
+    ("Sec-Ch-Ua-Mobile", "?0"),
+    ("Sec-Ch-Ua-Platform", "\"Windows\""),
+  ]
+
 proc newMoriru*(ex: var BaseExtractor) =
   ex = MoriruEX(
     name: "mori",
     host: "miruro.tv"
+  )
+
+proc pipeReq(ex: MoriruEX; encoded: string): string =
+  impersonatedGet(
+    "https://" & ex.host & "/api/secure/pipe?e=" & encoded,
+    headers = IMPERSONATE_HEADERS
   )
 
 proc decode(ex: MoriruEX; text: string): string =
@@ -49,7 +71,7 @@ proc toSlug(title: string): string =
 
 method animes*(ex: MoriruEX; title: string) : seq[AnimeData] =
   let
-    encodedResp = ex.connection.req("/api/secure/pipe?e=" & (SEARCH_TEMPLATE % title).encode).to_readable()
+    encodedResp = ex.pipeReq (SEARCH_TEMPLATE % title).encode
     decodedResp = ex.decode(encodedResp).parseJson()
 
   for anime in decodedResp:
@@ -67,7 +89,7 @@ method animes*(ex: MoriruEX; title: string) : seq[AnimeData] =
   
 method episodes*(ex: MoriruEX; animeId: string) : seq[EpisodeData] =
   let
-    encodedResp = ex.connection.req("/api/secure/pipe?e=" & (LIST_EPISODE_TEMPLATE % animeId).encode).to_readable()
+    encodedResp = ex.pipeReq (LIST_EPISODE_TEMPLATE % animeId).encode
     decodedResp = ex.decode(encodedResp).parseJson()
 
   for eps in decodedResp["providers"][PROVIDER]["episodes"]["sub"]:
@@ -80,7 +102,7 @@ method episodes*(ex: MoriruEX; animeId: string) : seq[EpisodeData] =
 
 method formats*(ex: MoriruEX; episodeUrl: string) : seq[ExFormatData] =
   let
-    encodedResp = ex.connection.req("/api/secure/pipe?e=" & (LIST_FORMAT_TEMPLATE % episodeUrl.split("|")).encode).to_readable()
+    encodedResp = ex.pipeReq (LIST_FORMAT_TEMPLATE % episodeUrl.split("|")).encode
     decodedResp = ex.decode(encodedResp).parseJson()
 
   for stream in decodedResp["streams"]:
