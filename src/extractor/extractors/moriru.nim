@@ -120,15 +120,17 @@ method formats*(ex: MoriruEX; episodeUrl: string) : seq[ExFormatData] =
       )
 
 method get*(ex: MoriruEX; data: ExFormatData) : MediaFormatData =
-  let header = MediaHttpHeader(
-    referer: "https://kwik.cx/"
-  )
-
   # owocdn.top (miruro's CDN) 403s ffmpeg/ffplay's own HTTPS client the same
   # way it 403s plain curl — it's checking the TLS fingerprint, not just the
   # referer. Neither the player nor ani-dl's ffmpeg downloader can fetch this
   # CDN directly, so mirror the whole VOD locally via curl-impersonate first
   # and hand the player a local playlist instead of the remote one.
+  #
+  # The Referer here is only for curl-impersonate's own fetches -- once
+  # mirrored, ffmpeg reads purely local files (playlist/key/segments), and
+  # -headers is an HTTP-only ffmpeg option: passing it errors out with
+  # "Option headers not found" when ffmpeg opens the local key/segment
+  # files, so MediaFormatData.headers must stay unset here.
   let localPlaylist = mirrorHlsVod(
     data.format_identifier,
     headers = [("Referer", "https://kwik.cx/")],
@@ -137,6 +139,5 @@ method get*(ex: MoriruEX; data: ExFormatData) : MediaFormatData =
 
   result = MediaFormatData(
     video: localPlaylist,
-    headers: some header,
     typeExt: extM3u8
   )
