@@ -3,7 +3,7 @@
 ## Cloudflare's bot detection. Only used where the plain Nim httpclient
 ## gets blocked outright.
 
-import std/[os, osproc, strutils, oids, uri]
+import std/[os, osproc, strutils, oids, uri, sequtils]
 
 type
   ImpersonateError* = object of CatchableError
@@ -60,10 +60,16 @@ proc resolveUrl(base: string; relative: string): string =
     return relative
   return $(parseUri(base) / relative)
 
+type
+  LogProc* = proc(text: string) {.gcsafe, closure.}
+
+proc noopLog(text: string) {.gcsafe.} = discard
+
 proc mirrorHlsVod*(
   playlistUrl: string,
   headers: openArray[(string, string)] = [],
-  browser: string = "chrome124"
+  browser: string = "chrome124",
+  log: LogProc = noopLog
 ): string =
   ## Downloads an HLS VOD playlist plus every key/segment it references via
   ## curl-impersonate, into a local temp directory, and rewrites the
@@ -73,31 +79,57 @@ proc mirrorHlsVod*(
   ## HTTPS client included) even though the referer/headers are correct —
   ## ffplay/mpv can't fetch such a CDN directly, so we mirror the whole VOD
   ## first and hand the player a local file instead.
+  ##
+  ## `log` is called with a one-line progress/status message per fetch --
+  ## this whole mirroring pass happens before ffmpeg is even started, so
+  ## without it there's no visibility into what curl-impersonate is doing
+  ## or which segment (if any) failed to fetch.
+  log("Fetching playlist: " & playlistUrl)
   let playlist = impersonatedGet(playlistUrl, headers, browser)
 
   let outDir = getTempDir() / "wewbo-hls-" & $genOid()
   createDir(outDir)
 
-  var rewritten: seq[string]
-  for line in playlist.splitLines():
-    if line.startsWith("#EXT-X-KEY") and "URI=\"" in line:
-      let uriStart = line.find("URI=\"") + 5
-      let uriEnd = line.find("\"", uriStart)
-      let keyUrl = resolveUrl(playlistUrl, line[uriStart ..< uriEnd])
-      let keyData = impersonatedGet(keyUrl, headers, browser)
-      let localKey = outDir / "key.bin"
-      localKey.writeFile(keyData)
-      rewritten.add line[0 ..< uriStart] & localKey & line[uriEnd .. ^1]
+  let segmentCount = playlist.splitLines().filterIt(it.len > 0 and not it.startsWith("#")).len
+  log("Mirroring " & $segmentCount & " segment(s) to " & outDir)
 
-    elif line.len > 0 and not line.startsWith("#"):
-      let segUrl = resolveUrl(playlistUrl, line)
-      let segData = impersonatedGet(segUrl, headers, browser)
-      let localSeg = outDir / ("seg-" & $rewritten.len & extractFilename(parseUri(segUrl).path))
-      localSeg.writeFile(segData)
-      rewritten.add localSeg
+  var
+    rewritten: seq[string]
+    segmentsFetched = 0
 
-    else:
-      rewritten.add line
+  try:
+    for line in playlist.splitLines():
+      if line.startsWith("#EXT-X-KEY") and "URI=\"" in line:
+        let uriStart = line.find("URI=\"") + 5
+        let uriEnd = line.find("\"", uriStart)
+        let keyUrl = resolveUrl(playlistUrl, line[uriStart ..< uriEnd])
+        log("Fetching decryption key: " & keyUrl)
+        let keyData = impersonatedGet(keyUrl, headers, browser)
+        let localKey = outDir / "key.bin"
+        localKey.writeFile(keyData)
+        rewritten.add line[0 ..< uriStart] & localKey & line[uriEnd .. ^1]
+
+      elif line.len > 0 and not line.startsWith("#"):
+        let segUrl = resolveUrl(playlistUrl, line)
+        let localSeg = outDir / ("seg-" & $rewritten.len & extractFilename(parseUri(segUrl).path))
+        let segData = impersonatedGet(segUrl, headers, browser)
+        localSeg.writeFile(segData)
+        rewritten.add localSeg
+        inc segmentsFetched
+
+        if (segmentsFetched mod 10) == 0:
+          log("Mirrored " & $segmentsFetched & "/" & $segmentCount & " segment(s)")
+
+      else:
+        rewritten.add line
+
+  except ImpersonateError as e:
+    log("Mirroring failed after " & $segmentsFetched & "/" & $segmentCount &
+      " segment(s): " & e.msg)
+    removeDir(outDir)
+    raise
+
+  log("Mirrored " & $segmentsFetched & "/" & $segmentCount & " segment(s)")
 
   let localPlaylist = outDir / "local.m3u8"
   localPlaylist.writeFile(rewritten.join("\n"))

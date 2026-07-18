@@ -131,7 +131,8 @@ method get*(ex: MoriruEX; data: ExFormatData) : MediaFormatData =
   # and hand the player a local playlist instead of the remote one.
   let localPlaylist = mirrorHlsVod(
     data.format_identifier,
-    headers = [("Referer", "https://kwik.cx/")]
+    headers = [("Referer", "https://kwik.cx/")],
+    log = proc(text: string) = ex.lg.info(text)
   )
 
   result = MediaFormatData(
