@@ -1,8 +1,9 @@
 # wewbo
 An interactive terminal application for searching and watching anime from various streaming sources. [Install Here](#install)
 
-> [!IMPORTANT]  
-> This project is currently readonly. Development will continue at an unknown time. You can still use it with some sources that are still active. Some sources may no longer be active until they use Cloudflare. Thanks for all your support! Hopefully we can meet again in version 2.
+> [!IMPORTANT]
+> Original project by upi-0 is currently read-only. This is a fork. As of now, only downloading is expected to work.
+> If the original upstream resumes development, this fork may be retired in its favor.
 
 <p align="center">
   <img width="75%" src="https://raw.githubusercontent.com/upi-0/wewbo/refs/heads/main/asset/tuiPreview.png">
@@ -16,22 +17,23 @@ Wewbo is a command-line-based application that allows you to search for anime, s
 | Name | Web | Status | Issue |
 |---------|-----------|----| -- |
 | Mori | https://miruro.tv | ✅ | - |
-| Alme | https://allanime.day | ✅ | - |
-| Taku | https://otakudesu.best | ✅ | - |
+| Alme | https://allanime.day | ? | - |
+| Taku | https://otakudesu.best | ? | - |
 
 ## How to Use
 
-### Streaming
+### Downloading
+```bash
+wewbo ani-dl [anime title]
+```
+
+### Streaming (may not work)
 
 ```bash
 wewbo [anime title]
 wewbo stream [anime title]
 ```
 
-### Downloading
-```bash
-wewbo ani-dl [anime title]
-```
 ### Usage Examples
 
 ```bash
@@ -49,21 +51,9 @@ wewbo "demon slayer:taku" --mpv:/path/to/mpv
 ```
 
 ## Install
-Make sure [mpv](https://mpv.io) & [ffmpeg](https://www.ffmpeg.org/) are available in your `$PATH`. [Learn how](https://www.google.com/search?q=adding+app+to+path)
-### Windows
-<b>Scoop</b>
-```powershell
-# Install Scoop
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+Make sure [ffmpeg](https://www.ffmpeg.org) is available in your `$PATH`. [Learn how](https://www.google.com/search?q=adding+app+to+path)
+Due to unfortunate spread of Cloudflare, [curl-impersonate](https://github.com/lexiforest/curl-impersonate) is now the extra dependency.
 
-# Install wewbo & mpv
-scoop bucket add extras
-scoop install mpv https://upi.web.id/wewbo.json
-
-# Install ffmpeg (recommended)
-scoop install ffmpeg
-```
 ### Linux
 
 <b>Curl</b>
@@ -77,6 +67,13 @@ yay -S wewbo
 ```
 ```bash
 paru -S wewbo
+```
+
+### macOS
+
+<b>PPCPorts</b>
+```bash
+sudo port install curl-impersonate nim-wewbo
 ```
 
 ### Nim

@@ -1,6 +1,6 @@
 # Package
 
-version = "1.4.1"
+version       = "1.5.0"
 author        = "upi-0"
 description   = "An interactive terminal application for streaming and downloading anime from various streaming sources."
 license       = "GPL-3.0"
@@ -8,7 +8,7 @@ srcDir        = "src"
 installExt    = @["nim"]
 bin           = @["wewbo"]
 
-skipDirs = @["asset"]
+skipDirs      = @["asset"]
 
 # Dependencies
 
@@ -18,3 +18,5 @@ requires "htmlparser"
 requires "malebolgia >= 1.3.0"
 requires "zippy >= 0.10.18"
 requires "nimcrypto >= 0.7.2"
+
+# Needs curl-impersonate at runtime.
